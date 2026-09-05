@@ -1,3 +1,4 @@
+import { execSync } from 'node:child_process'
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 import { VitePWA } from 'vite-plugin-pwa'
@@ -6,14 +7,32 @@ import { defineConfig } from 'vitest/config'
 // GitHub Pages serves this as a project site under /flightlog.me/, not at the domain root.
 const base = '/flightlog.me/'
 
+// Surfaced in Settings and by the update banner, so it's possible to tell whether
+// a deploy actually landed on a given device. Falls back to 'unknown' rather than
+// failing the build if git isn't available in the build environment.
+const commitHash = (() => {
+  try {
+    return execSync('git rev-parse --short HEAD').toString().trim()
+  } catch {
+    return 'unknown'
+  }
+})()
+const buildTime = new Date().toISOString()
+
 // https://vite.dev/config/
 export default defineConfig({
   base,
+  define: {
+    __APP_COMMIT__: JSON.stringify(commitHash),
+    __APP_BUILD_TIME__: JSON.stringify(buildTime),
+  },
   plugins: [
     react(),
     tailwindcss(),
     VitePWA({
-      registerType: 'autoUpdate',
+      // 'prompt' (not 'autoUpdate') so a new build shows the reload banner
+      // instead of silently swapping the app out from under an open session.
+      registerType: 'prompt',
       includeAssets: ['icons/icon-192.png', 'icons/icon-512.png'],
       manifest: {
         name: 'flightlog.me',

@@ -6,6 +6,7 @@ import { FlightCard } from './components/FlightCard'
 import { FlightForm } from './components/FlightForm'
 import { Dashboard } from './components/Dashboard'
 import { Settings } from './components/Settings'
+import { UpdateBanner } from './components/UpdateBanner'
 
 type Tab = 'flights' | 'dashboard' | 'settings'
 type View = { tab: Tab; editing?: Flight | 'new' }
@@ -58,19 +59,23 @@ export default function App() {
   if (view.editing) {
     const initial = view.editing === 'new' ? createBlankFlight() : view.editing
     return (
-      <FlightForm
-        initial={initial}
-        onSave={saveFlight}
-        onCancel={() => setView({ tab: view.tab })}
-        onDelete={
-          view.editing !== 'new' ? () => deleteFlight((view.editing as Flight).id) : undefined
-        }
-      />
+      <>
+        <UpdateBanner />
+        <FlightForm
+          initial={initial}
+          onSave={saveFlight}
+          onCancel={() => setView({ tab: view.tab })}
+          onDelete={
+            view.editing !== 'new' ? () => deleteFlight((view.editing as Flight).id) : undefined
+          }
+        />
+      </>
     )
   }
 
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950 pb-20">
+      <UpdateBanner />
       <header className="sticky top-0 z-10 bg-white/90 dark:bg-slate-900/90 backdrop-blur border-b border-black/10 dark:border-white/10 p-4">
         <h1 className="text-lg font-bold text-slate-900 dark:text-slate-100">flightlog.me</h1>
       </header>

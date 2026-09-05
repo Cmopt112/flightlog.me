@@ -25,8 +25,22 @@ export function Settings({
   onToggleDarkMode: () => void
 }) {
   const [message, setMessage] = useState<string | null>(null)
+  const [updateStatus, setUpdateStatus] = useState<string | null>(null)
   const backupInputRef = useRef<HTMLInputElement>(null)
   const csvInputRef = useRef<HTMLInputElement>(null)
+
+  async function checkForUpdate() {
+    setUpdateStatus('Checking…')
+    const reg = await navigator.serviceWorker.getRegistration()
+    if (!reg) {
+      setUpdateStatus('Not installed as an app yet — nothing to check.')
+      return
+    }
+    await reg.update()
+    // The browser now fetches/installs any new build in the background; if it finds
+    // one, the reload banner at the top appears on its own a moment later.
+    setUpdateStatus('Checked — the reload banner will appear above if a new version was found.')
+  }
 
   async function handleBackupFile(file: File) {
     const text = await file.text()
@@ -106,6 +120,17 @@ export function Settings({
             onChange={(e) => e.target.files?.[0] && handleCsvFile(e.target.files[0])}
           />
         </div>
+      </section>
+
+      <section className="space-y-2">
+        <h2 className="font-semibold text-slate-900 dark:text-slate-100">Updates</h2>
+        <p className="text-sm text-slate-500 dark:text-slate-400">
+          Build {__APP_COMMIT__} · {new Date(__APP_BUILD_TIME__).toLocaleDateString()}
+        </p>
+        <button className={buttonClass} onClick={checkForUpdate}>
+          Check for updates
+        </button>
+        {updateStatus && <p className="text-sm text-slate-500 dark:text-slate-400">{updateStatus}</p>}
       </section>
 
       {message && (
