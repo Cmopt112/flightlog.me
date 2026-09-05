@@ -1,0 +1,331 @@
+import { useState } from 'react'
+import type { AdvancedFields, Flight, FlightTag, Role } from '../models/flight'
+import { decimalHoursToHHMM, hhmmToDecimalHours } from '../lib/time'
+
+const ROLES: Role[] = ['Dual', 'PIC', 'SIC', 'CFI']
+const PRESET_TAGS: FlightTag[] = ['Training', 'Firefighting', 'Ferry', 'Simulator', 'Checkride']
+
+type AdvancedFieldConfig =
+  | { key: keyof AdvancedFields; label: string; type: 'text' }
+  | { key: keyof AdvancedFields; label: string; type: 'number' }
+  | { key: keyof AdvancedFields; label: string; type: 'boolean' }
+
+const ADVANCED_FIELDS: AdvancedFieldConfig[] = [
+  { key: 'approaches', label: 'Approaches', type: 'number' },
+  { key: 'hold', label: 'Hold', type: 'number' },
+  { key: 'xCountry', label: 'Cross-country (hrs)', type: 'number' },
+  { key: 'night', label: 'Night (hrs)', type: 'number' },
+  { key: 'imc', label: 'IMC (hrs)', type: 'number' },
+  { key: 'simulatedInstrument', label: 'Simulated instrument (hrs)', type: 'number' },
+  { key: 'groundSimulator', label: 'Ground simulator (hrs)', type: 'number' },
+  { key: 'fsNightLandings', label: 'Full-stop night landings', type: 'number' },
+  { key: 'fsDayLandings', label: 'Full-stop day landings', type: 'number' },
+  { key: 'hobbsStart', label: 'Hobbs start', type: 'number' },
+  { key: 'hobbsEnd', label: 'Hobbs end', type: 'number' },
+  { key: 'engineStart', label: 'Engine start (UTC)', type: 'text' },
+  { key: 'engineEnd', label: 'Engine end (UTC)', type: 'text' },
+  { key: 'flightStart', label: 'Flight start (UTC)', type: 'text' },
+  { key: 'flightEnd', label: 'Flight end (UTC)', type: 'text' },
+  { key: 'blockIn', label: 'Block in', type: 'text' },
+  { key: 'blockOut', label: 'Block out', type: 'text' },
+  { key: 'complex', label: 'Complex', type: 'boolean' },
+  { key: 'controllablePitchProp', label: 'Controllable pitch prop', type: 'boolean' },
+  { key: 'flaps', label: 'Flaps', type: 'boolean' },
+  { key: 'retract', label: 'Retractable gear', type: 'boolean' },
+  { key: 'tailwheel', label: 'Tailwheel', type: 'boolean' },
+  { key: 'highPerformance', label: 'High performance', type: 'boolean' },
+  { key: 'turbine', label: 'Turbine', type: 'boolean' },
+  { key: 'taa', label: 'TAA', type: 'boolean' },
+  { key: 'checkrideNewRating', label: 'Checkride - new rating', type: 'boolean' },
+  { key: 'externalLineUnder50ft', label: 'External line - under 50ft', type: 'boolean' },
+  { key: 'simulatorTrainingDeviceId', label: 'Simulator/training device ID', type: 'text' },
+  { key: 'signatureState', label: 'Signature state', type: 'text' },
+  { key: 'cfiName', label: 'CFI name', type: 'text' },
+  { key: 'cfiComment', label: 'CFI comment', type: 'text' },
+]
+
+export function FlightForm({
+  initial,
+  onSave,
+  onDelete,
+  onCancel,
+}: {
+  initial: Flight
+  onSave: (flight: Flight) => void
+  onDelete?: () => void
+  onCancel: () => void
+}) {
+  const [flight, setFlight] = useState<Flight>(initial)
+  const [showAdvanced, setShowAdvanced] = useState(false)
+
+  function update<K extends keyof Flight>(key: K, value: Flight[K]) {
+    setFlight((f) => ({ ...f, [key]: value }))
+  }
+
+  function updateAdvanced<K extends keyof AdvancedFields>(key: K, value: AdvancedFields[K]) {
+    setFlight((f) => ({ ...f, advanced: { ...f.advanced, [key]: value } }))
+  }
+
+  function toggleTag(tag: FlightTag) {
+    setFlight((f) => ({
+      ...f,
+      tags: f.tags.includes(tag) ? f.tags.filter((t) => t !== tag) : [...f.tags, tag],
+    }))
+  }
+
+  return (
+    <div className="max-w-lg mx-auto p-4 space-y-4 pb-24">
+      <div className="grid grid-cols-2 gap-3">
+        <Field label="Date">
+          <input
+            type="date"
+            className={inputClass}
+            value={flight.date}
+            onChange={(e) => update('date', e.target.value)}
+          />
+        </Field>
+        <Field label="Total time (HH:MM)">
+          <input
+            type="text"
+            className={inputClass}
+            placeholder="1:30"
+            defaultValue={decimalHoursToHHMM(flight.totalTimeDecimal)}
+            onBlur={(e) => update('totalTimeDecimal', hhmmToDecimalHours(e.target.value || '0:00'))}
+          />
+        </Field>
+      </div>
+
+      <div className="grid grid-cols-2 gap-3">
+        <Field label="Model">
+          <input
+            type="text"
+            className={inputClass}
+            placeholder="BH-412, Bell"
+            value={flight.model}
+            onChange={(e) => update('model', e.target.value)}
+          />
+        </Field>
+        <Field label="Tail number">
+          <input
+            type="text"
+            className={inputClass}
+            placeholder="EC-GOP"
+            value={flight.tailNumber}
+            onChange={(e) => update('tailNumber', e.target.value)}
+          />
+        </Field>
+      </div>
+
+      <div className="grid grid-cols-2 gap-3">
+        <Field label="Route from">
+          <input
+            type="text"
+            className={inputClass}
+            placeholder="HHER"
+            value={flight.routeFrom ?? ''}
+            onChange={(e) => update('routeFrom', e.target.value || undefined)}
+          />
+        </Field>
+        <Field label="Route to">
+          <input
+            type="text"
+            className={inputClass}
+            placeholder="LEON"
+            value={flight.routeTo ?? ''}
+            onChange={(e) => update('routeTo', e.target.value || undefined)}
+          />
+        </Field>
+      </div>
+
+      <Field label="Role">
+        <div className="flex gap-2">
+          {ROLES.map((role) => (
+            <button
+              key={role}
+              type="button"
+              onClick={() => update('role', role)}
+              className={`flex-1 py-2 rounded-lg text-sm font-medium border ${
+                flight.role === role
+                  ? 'bg-blue-600 text-white border-blue-600'
+                  : 'bg-white dark:bg-slate-800 border-black/10 dark:border-white/10 text-slate-700 dark:text-slate-200'
+              }`}
+            >
+              {role}
+            </button>
+          ))}
+        </div>
+      </Field>
+
+      <div className="grid grid-cols-2 gap-3">
+        <Field label="Landings (day)">
+          <input
+            type="number"
+            min={0}
+            className={inputClass}
+            value={flight.landingsDay}
+            onChange={(e) => update('landingsDay', Number(e.target.value) || 0)}
+          />
+        </Field>
+        <Field label="Landings (night)">
+          <input
+            type="number"
+            min={0}
+            className={inputClass}
+            value={flight.landingsNight}
+            onChange={(e) => update('landingsNight', Number(e.target.value) || 0)}
+          />
+        </Field>
+      </div>
+
+      <Field label="Sling load carries / discharges">
+        <div className="flex items-center gap-3">
+          <StepperButton
+            onClick={() => update('slingLoadCarries', Math.max(0, (flight.slingLoadCarries ?? 0) - 1))}
+          >
+            −
+          </StepperButton>
+          <span className="text-2xl font-mono font-semibold w-10 text-center">
+            {flight.slingLoadCarries ?? 0}
+          </span>
+          <StepperButton onClick={() => update('slingLoadCarries', (flight.slingLoadCarries ?? 0) + 1)}>
+            +
+          </StepperButton>
+        </div>
+      </Field>
+
+      <Field label="Crew">
+        <input
+          type="text"
+          className={inputClass}
+          placeholder="J. Doe"
+          value={flight.crew ?? ''}
+          onChange={(e) => update('crew', e.target.value || undefined)}
+        />
+      </Field>
+
+      <Field label="Comments">
+        <textarea
+          className={inputClass}
+          rows={2}
+          value={flight.comments ?? ''}
+          onChange={(e) => update('comments', e.target.value || undefined)}
+        />
+      </Field>
+
+      <label className="flex items-center gap-2 text-sm text-slate-700 dark:text-slate-200">
+        <input
+          type="checkbox"
+          checked={flight.isSimulator}
+          onChange={(e) => update('isSimulator', e.target.checked)}
+        />
+        This is a simulator / synthetic training session
+      </label>
+
+      <Field label="Tags">
+        <div className="flex flex-wrap gap-2">
+          {PRESET_TAGS.map((tag) => (
+            <button
+              key={tag}
+              type="button"
+              onClick={() => toggleTag(tag)}
+              className={`text-sm px-3 py-1 rounded-full border ${
+                flight.tags.includes(tag)
+                  ? 'bg-blue-600 text-white border-blue-600'
+                  : 'bg-white dark:bg-slate-800 border-black/10 dark:border-white/10 text-slate-700 dark:text-slate-200'
+              }`}
+            >
+              {tag}
+            </button>
+          ))}
+        </div>
+      </Field>
+
+      <div>
+        <button
+          type="button"
+          onClick={() => setShowAdvanced((v) => !v)}
+          className="text-sm text-blue-600 dark:text-blue-400 font-medium"
+        >
+          {showAdvanced ? '▾ Hide advanced fields' : '▸ Show advanced fields'}
+        </button>
+        {showAdvanced && (
+          <div className="mt-3 grid grid-cols-2 gap-3">
+            {ADVANCED_FIELDS.map((f) => (
+              <Field key={f.key} label={f.label}>
+                {f.type === 'boolean' ? (
+                  <label className="flex items-center gap-2 text-sm">
+                    <input
+                      type="checkbox"
+                      checked={!!flight.advanced[f.key]}
+                      onChange={(e) => updateAdvanced(f.key, e.target.checked as never)}
+                    />
+                  </label>
+                ) : (
+                  <input
+                    type={f.type === 'number' ? 'number' : 'text'}
+                    className={inputClass}
+                    value={(flight.advanced[f.key] as string | number | undefined) ?? ''}
+                    onChange={(e) =>
+                      updateAdvanced(
+                        f.key,
+                        (f.type === 'number'
+                          ? e.target.value === ''
+                            ? undefined
+                            : Number(e.target.value)
+                          : e.target.value || undefined) as never,
+                      )
+                    }
+                  />
+                )}
+              </Field>
+            ))}
+          </div>
+        )}
+      </div>
+
+      <div className="fixed bottom-0 left-0 right-0 bg-white dark:bg-slate-900 border-t border-black/10 dark:border-white/10 p-3 flex gap-2 max-w-lg mx-auto">
+        <button
+          onClick={onCancel}
+          className="flex-1 py-3 rounded-lg border border-black/10 dark:border-white/10 text-slate-700 dark:text-slate-200"
+        >
+          Cancel
+        </button>
+        {onDelete && (
+          <button onClick={onDelete} className="py-3 px-4 rounded-lg border border-red-300 text-red-600">
+            Delete
+          </button>
+        )}
+        <button
+          onClick={() => onSave({ ...flight, updatedAt: new Date().toISOString() })}
+          className="flex-1 py-3 rounded-lg bg-blue-600 text-white font-medium"
+        >
+          Save
+        </button>
+      </div>
+    </div>
+  )
+}
+
+const inputClass =
+  'w-full rounded-lg border border-black/10 dark:border-white/10 bg-white dark:bg-slate-800 px-3 py-2 text-slate-900 dark:text-slate-100'
+
+function Field({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <label className="block">
+      <span className="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1">{label}</span>
+      {children}
+    </label>
+  )
+}
+
+function StepperButton({ children, onClick }: { children: React.ReactNode; onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="w-11 h-11 rounded-full bg-blue-600 text-white text-xl font-semibold flex items-center justify-center"
+    >
+      {children}
+    </button>
+  )
+}
