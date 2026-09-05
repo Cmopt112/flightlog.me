@@ -102,3 +102,32 @@ export function createBlankFlight(overrides: Partial<Flight> = {}): Flight {
     ...overrides,
   }
 }
+
+/**
+ * A fresh flight pre-filled with the "sticky" fields from the most recent one
+ * (aircraft, role, crew) - these rarely change flight-to-flight, unlike date,
+ * time, route and landings, which always need a fresh value. Cuts retyping the
+ * same aircraft/crew on every single entry down to just the fields that actually
+ * change. Full duplication (same route/time too) stays a separate, explicit action.
+ */
+export function createDraftFromLast(last: Flight | undefined): Flight {
+  if (!last) return createBlankFlight()
+  return createBlankFlight({
+    model: last.model,
+    icaoModel: last.icaoModel,
+    tailNumber: last.tailNumber,
+    categoryClass: last.categoryClass,
+    role: last.role,
+    crew: last.crew,
+    advanced: {
+      turbine: last.advanced.turbine,
+      complex: last.advanced.complex,
+      controllablePitchProp: last.advanced.controllablePitchProp,
+      flaps: last.advanced.flaps,
+      retract: last.advanced.retract,
+      tailwheel: last.advanced.tailwheel,
+      highPerformance: last.advanced.highPerformance,
+      taa: last.advanced.taa,
+    },
+  })
+}

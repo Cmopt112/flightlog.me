@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { AdvancedFields, Flight, FlightTag, Role } from '../models/flight'
 import { decimalHoursToHHMM, hhmmToDecimalHours } from '../lib/time'
 
@@ -46,11 +46,15 @@ const ADVANCED_FIELDS: AdvancedFieldConfig[] = [
 
 export function FlightForm({
   initial,
+  recentTails = [],
+  recentCrew = [],
   onSave,
   onDelete,
   onCancel,
 }: {
   initial: Flight
+  recentTails?: string[]
+  recentCrew?: string[]
   onSave: (flight: Flight) => void
   onDelete?: () => void
   onCancel: () => void
@@ -75,25 +79,23 @@ export function FlightForm({
 
   return (
     <div className="max-w-lg mx-auto p-4 space-y-4 pb-24">
-      <div className="grid grid-cols-2 gap-3">
-        <Field label="Date">
-          <input
-            type="date"
-            className={inputClass}
-            value={flight.date}
-            onChange={(e) => update('date', e.target.value)}
-          />
-        </Field>
-        <Field label="Total time (HH:MM)">
-          <input
-            type="text"
-            className={inputClass}
-            placeholder="1:30"
-            defaultValue={decimalHoursToHHMM(flight.totalTimeDecimal)}
-            onBlur={(e) => update('totalTimeDecimal', hhmmToDecimalHours(e.target.value || '0:00'))}
-          />
-        </Field>
-      </div>
+      <Field label="Date">
+        <input
+          type="date"
+          className={inputClass}
+          value={flight.date}
+          onChange={(e) => update('date', e.target.value)}
+        />
+      </Field>
+      <Field label="Total time (HH:MM)">
+        <input
+          type="text"
+          className={inputClass}
+          placeholder="1:30"
+          defaultValue={decimalHoursToHHMM(flight.totalTimeDecimal)}
+          onBlur={(e) => update('totalTimeDecimal', hhmmToDecimalHours(e.target.value || '0:00'))}
+        />
+      </Field>
 
       <div className="grid grid-cols-2 gap-3">
         <Field label="Model">
@@ -116,7 +118,14 @@ export function FlightForm({
         </Field>
       </div>
 
-      <div className="grid grid-cols-2 gap-3">
+      {recentTails.length > 0 && (
+        <ChipRow
+          options={recentTails}
+          onPick={(tail) => update('tailNumber', tail)}
+        />
+      )}
+
+      <div className="grid grid-cols-[1fr_auto_1fr] gap-2 items-end">
         <Field label="Route from">
           <input
             type="text"
@@ -126,6 +135,16 @@ export function FlightForm({
             onChange={(e) => update('routeFrom', e.target.value || undefined)}
           />
         </Field>
+        <button
+          type="button"
+          aria-label="Swap route direction"
+          onClick={() =>
+            setFlight((f) => ({ ...f, routeFrom: f.routeTo, routeTo: f.routeFrom }))
+          }
+          className="h-10 w-10 rounded-lg border border-black/10 dark:border-white/10 text-slate-500 dark:text-slate-400 flex items-center justify-center"
+        >
+          ⇄
+        </button>
         <Field label="Route to">
           <input
             type="text"
@@ -158,39 +177,18 @@ export function FlightForm({
 
       <div className="grid grid-cols-2 gap-3">
         <Field label="Landings (day)">
-          <input
-            type="number"
-            min={0}
-            className={inputClass}
-            value={flight.landingsDay}
-            onChange={(e) => update('landingsDay', Number(e.target.value) || 0)}
-          />
+          <NumberStepper value={flight.landingsDay} onChange={(v) => update('landingsDay', v)} />
         </Field>
         <Field label="Landings (night)">
-          <input
-            type="number"
-            min={0}
-            className={inputClass}
-            value={flight.landingsNight}
-            onChange={(e) => update('landingsNight', Number(e.target.value) || 0)}
-          />
+          <NumberStepper value={flight.landingsNight} onChange={(v) => update('landingsNight', v)} />
         </Field>
       </div>
 
       <Field label="Sling load carries / discharges">
-        <div className="flex items-center gap-3">
-          <StepperButton
-            onClick={() => update('slingLoadCarries', Math.max(0, (flight.slingLoadCarries ?? 0) - 1))}
-          >
-            −
-          </StepperButton>
-          <span className="text-2xl font-mono font-semibold w-10 text-center">
-            {flight.slingLoadCarries ?? 0}
-          </span>
-          <StepperButton onClick={() => update('slingLoadCarries', (flight.slingLoadCarries ?? 0) + 1)}>
-            +
-          </StepperButton>
-        </div>
+        <NumberStepper
+          value={flight.slingLoadCarries ?? 0}
+          onChange={(v) => update('slingLoadCarries', v)}
+        />
       </Field>
 
       <Field label="Crew">
@@ -202,6 +200,7 @@ export function FlightForm({
           onChange={(e) => update('crew', e.target.value || undefined)}
         />
       </Field>
+      {recentCrew.length > 0 && <ChipRow options={recentCrew} onPick={(crew) => update('crew', crew)} />}
 
       <Field label="Comments">
         <textarea
@@ -318,6 +317,24 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
   )
 }
 
+/** Tap-to-fill chips for a recently-used value (aircraft, crew), so a repeat entry is one tap. */
+function ChipRow({ options, onPick }: { options: string[]; onPick: (value: string) => void }) {
+  return (
+    <div className="flex flex-wrap gap-1.5 -mt-2">
+      {options.map((value) => (
+        <button
+          key={value}
+          type="button"
+          onClick={() => onPick(value)}
+          className="text-xs px-2.5 py-1 rounded-full bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300"
+        >
+          {value}
+        </button>
+      ))}
+    </div>
+  )
+}
+
 function StepperButton({ children, onClick }: { children: React.ReactNode; onClick: () => void }) {
   return (
     <button
@@ -327,5 +344,50 @@ function StepperButton({ children, onClick }: { children: React.ReactNode; onCli
     >
       {children}
     </button>
+  )
+}
+
+/**
+ * +/- stepper for quick one-handed use; tapping the number itself switches to a
+ * plain numeric input for the rare case of entering a large count directly.
+ */
+function NumberStepper({ value, onChange, min = 0 }: { value: number; onChange: (v: number) => void; min?: number }) {
+  const [editing, setEditing] = useState(false)
+  const inputRef = useRef<HTMLInputElement>(null)
+
+  useEffect(() => {
+    if (editing) inputRef.current?.select()
+  }, [editing])
+
+  function commit(raw: string) {
+    const n = Number(raw)
+    onChange(Number.isFinite(n) ? Math.max(min, Math.round(n)) : value)
+    setEditing(false)
+  }
+
+  return (
+    <div className="flex items-center gap-3">
+      <StepperButton onClick={() => onChange(Math.max(min, value - 1))}>−</StepperButton>
+      {editing ? (
+        <input
+          ref={inputRef}
+          type="number"
+          inputMode="numeric"
+          defaultValue={value}
+          className="w-14 text-center text-2xl font-mono font-semibold rounded-lg border border-black/10 dark:border-white/10 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100"
+          onBlur={(e) => commit(e.target.value)}
+          onKeyDown={(e) => e.key === 'Enter' && commit((e.target as HTMLInputElement).value)}
+        />
+      ) : (
+        <button
+          type="button"
+          onClick={() => setEditing(true)}
+          className="text-2xl font-mono font-semibold w-10 text-center"
+        >
+          {value}
+        </button>
+      )}
+      <StepperButton onClick={() => onChange(value + 1)}>+</StepperButton>
+    </div>
   )
 }

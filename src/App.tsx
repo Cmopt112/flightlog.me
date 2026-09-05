@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from './db/db'
-import { createBlankFlight, type Flight } from './models/flight'
+import { createDraftFromLast, type Flight } from './models/flight'
 import { FlightCard } from './components/FlightCard'
 import { FlightForm } from './components/FlightForm'
 import { Dashboard } from './components/Dashboard'
@@ -12,6 +12,16 @@ type Tab = 'flights' | 'dashboard' | 'settings'
 type View = { tab: Tab; editing?: Flight | 'new' }
 
 const TAGS_FILTER_ALL = 'All'
+
+function recentDistinct(flights: Flight[], pick: (f: Flight) => string | undefined, limit: number): string[] {
+  const seen: string[] = []
+  for (const f of flights) {
+    const value = pick(f)
+    if (value && !seen.includes(value)) seen.push(value)
+    if (seen.length >= limit) break
+  }
+  return seen
+}
 
 export default function App() {
   const [view, setView] = useState<View>({ tab: 'flights' })
@@ -30,6 +40,11 @@ export default function App() {
     flights.forEach((f) => f.tags.forEach((t) => set.add(t)))
     return [TAGS_FILTER_ALL, ...Array.from(set)]
   }, [flights])
+
+  // Quick-pick chips for the form: most recent distinct values first (flights is
+  // already sorted newest-first), so a repeat aircraft/crew is one tap, not a retype.
+  const recentTails = useMemo(() => recentDistinct(flights, (f) => f.tailNumber, 5), [flights])
+  const recentCrew = useMemo(() => recentDistinct(flights, (f) => f.crew, 5), [flights])
 
   const visibleFlights =
     tagFilter === TAGS_FILTER_ALL ? flights : flights.filter((f) => f.tags.includes(tagFilter))
@@ -52,17 +67,19 @@ export default function App() {
     const last = flights[0]
     const draft = last
       ? { ...last, id: crypto.randomUUID(), date: new Date().toISOString().slice(0, 10) }
-      : createBlankFlight()
+      : createDraftFromLast(undefined)
     setView({ tab: 'flights', editing: draft })
   }
 
   if (view.editing) {
-    const initial = view.editing === 'new' ? createBlankFlight() : view.editing
+    const initial = view.editing === 'new' ? createDraftFromLast(flights[0]) : view.editing
     return (
       <>
         <UpdateBanner />
         <FlightForm
           initial={initial}
+          recentTails={recentTails}
+          recentCrew={recentCrew}
           onSave={saveFlight}
           onCancel={() => setView({ tab: view.tab })}
           onDelete={

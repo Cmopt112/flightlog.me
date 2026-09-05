@@ -82,7 +82,7 @@ export function Dashboard({ flights }: { flights: Flight[] }) {
       </section>
 
       <section>
-        <KpiTile label="Simulator hours (excluded above)" value={`${simulatorHours(flights)}h`} wide />
+        <KpiTile label="Simulator hours (included above)" value={`${simulatorHours(flights)}h`} wide />
       </section>
     </div>
   )

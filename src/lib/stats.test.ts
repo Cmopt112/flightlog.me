@@ -12,16 +12,14 @@ const fixturePath = join(
 const flights = parseMyFlightbookCsv(readFileSync(fixturePath, 'utf-8'))
 
 describe('stats cross-check against the synthetic fixture', () => {
-  it('total real (non-simulator) hours matches a manual sum', () => {
-    const manual = flights
-      .filter((f) => !f.isSimulator)
-      .reduce((acc, f) => acc + f.totalTimeDecimal, 0)
+  it('total hours (including simulator) matches a manual sum, same convention as MyFlightbook', () => {
+    const manual = flights.reduce((acc, f) => acc + f.totalTimeDecimal, 0)
     expect(totalHours(flights)).toBeCloseTo(manual, 2)
   })
 
-  it('simulator hours are excluded from totalHours and reported separately', () => {
+  it('simulator hours are a breakdown of the total, not a subtraction', () => {
     expect(simulatorHours(flights)).toBeCloseTo(3.5, 2) // the two SIM000 flights: 2.0 + 1.5
-    expect(totalHours(flights)).not.toBeCloseTo(totalHours(flights) + simulatorHours(flights), 2)
+    expect(simulatorHours(flights)).toBeLessThan(totalHours(flights))
   })
 
   it('hoursByRole sums back up to totalHours', () => {
@@ -30,12 +28,12 @@ describe('stats cross-check against the synthetic fixture', () => {
     expect(sum).toBeCloseTo(totalHours(flights), 1)
   })
 
-  it('monthlyBreakdown for a year sums to that year\'s real hours', () => {
+  it('monthlyBreakdown for a year sums to that year\'s total hours', () => {
     const year = new Date(flights[0].date).getFullYear()
     const months = monthlyBreakdown(flights, year)
     const monthSum = months.reduce((a, b) => a + b, 0)
     const manualYearSum = flights
-      .filter((f) => !f.isSimulator && new Date(f.date).getFullYear() === year)
+      .filter((f) => new Date(f.date).getFullYear() === year)
       .reduce((acc, f) => acc + f.totalTimeDecimal, 0)
     expect(monthSum).toBeCloseTo(manualYearSum, 1)
   })
