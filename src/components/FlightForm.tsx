@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import type { Aircraft } from '../models/aircraft'
 import type { AdvancedFields, Flight, FlightTag, Role } from '../models/flight'
 import {
   combineDateAndTime,
@@ -50,6 +51,7 @@ const ADVANCED_FIELDS: AdvancedFieldConfig[] = [
 
 export function FlightForm({
   initial,
+  aircraft = [],
   recentTails = [],
   recentCrew = [],
   onSave,
@@ -57,6 +59,7 @@ export function FlightForm({
   onCancel,
 }: {
   initial: Flight
+  aircraft?: Aircraft[]
   recentTails?: string[]
   recentCrew?: string[]
   onSave: (flight: Flight) => void
@@ -65,6 +68,21 @@ export function FlightForm({
 }) {
   const [flight, setFlight] = useState<Flight>(initial)
   const [showAdvanced, setShowAdvanced] = useState(false)
+
+  function pickAircraft(a: Aircraft) {
+    setFlight((f) => ({
+      ...f,
+      model: a.model,
+      icaoModel: a.icaoModel,
+      tailNumber: a.tailNumber,
+      categoryClass: a.categoryClass,
+      advanced: { ...f.advanced, ...a.characteristics },
+    }))
+  }
+
+  // Only show tails as plain "recent" chips when they aren't already covered by a
+  // saved aircraft above, so the same tail number doesn't appear in both rows.
+  const unregisteredRecentTails = recentTails.filter((t) => !aircraft.some((a) => a.tailNumber === t))
 
   // Clock times (Flight Start/End) are the primary, fast way to log a time - duration
   // is derived from them. Falls back to typing a duration directly for flights where
@@ -124,7 +142,7 @@ export function FlightForm({
       </Field>
       {timeMode === 'clock' ? (
         <>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-2 gap-6">
             <Field label="Departure">
               <input
                 type="time"
@@ -167,6 +185,18 @@ export function FlightForm({
         {timeMode === 'clock' ? 'Enter duration directly instead' : 'Enter departure/landing time instead'}
       </button>
 
+      {aircraft.length > 0 && (
+        <Field label="Aircraft">
+          <ChipRow
+            options={aircraft.map((a) => a.tailNumber)}
+            onPick={(tail) => {
+              const picked = aircraft.find((a) => a.tailNumber === tail)
+              if (picked) pickAircraft(picked)
+            }}
+          />
+        </Field>
+      )}
+
       <div className="grid grid-cols-2 gap-3">
         <Field label="Model">
           <input
@@ -188,9 +218,9 @@ export function FlightForm({
         </Field>
       </div>
 
-      {recentTails.length > 0 && (
+      {unregisteredRecentTails.length > 0 && (
         <ChipRow
-          options={recentTails}
+          options={unregisteredRecentTails}
           onPick={(tail) => update('tailNumber', tail)}
         />
       )}

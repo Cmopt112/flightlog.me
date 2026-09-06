@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from './db/db'
+import type { Aircraft } from './models/aircraft'
 import { createDraftFromLast, type Flight } from './models/flight'
 import { FlightCard } from './components/FlightCard'
 import { FlightForm } from './components/FlightForm'
@@ -34,6 +35,7 @@ export default function App() {
   }, [darkMode])
 
   const flights = useLiveQuery(() => db.flights.orderBy('date').reverse().toArray(), []) ?? []
+  const aircraft = useLiveQuery(() => db.aircraft.orderBy('tailNumber').toArray(), []) ?? []
 
   const allTags = useMemo(() => {
     const set = new Set<string>()
@@ -63,6 +65,18 @@ export default function App() {
     await db.flights.bulkPut(imported)
   }
 
+  async function saveAircraft(a: Aircraft) {
+    await db.aircraft.put(a)
+  }
+
+  async function deleteAircraft(id: string) {
+    await db.aircraft.delete(id)
+  }
+
+  async function bulkAddAircraft(list: Aircraft[]) {
+    await db.aircraft.bulkPut(list)
+  }
+
   function duplicateLast() {
     const last = flights[0]
     const draft = last
@@ -78,6 +92,7 @@ export default function App() {
         <UpdateBanner />
         <FlightForm
           initial={initial}
+          aircraft={aircraft}
           recentTails={recentTails}
           recentCrew={recentCrew}
           onSave={saveFlight}
@@ -155,6 +170,10 @@ export default function App() {
           onImport={importFlights}
           darkMode={darkMode}
           onToggleDarkMode={() => setDarkMode((d) => !d)}
+          aircraft={aircraft}
+          onSaveAircraft={saveAircraft}
+          onDeleteAircraft={deleteAircraft}
+          onBulkAddAircraft={bulkAddAircraft}
         />
       )}
 

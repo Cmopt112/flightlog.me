@@ -1,7 +1,9 @@
 import { useRef, useState } from 'react'
+import type { Aircraft } from '../models/aircraft'
 import type { Flight } from '../models/flight'
 import { parseBackup, serializeBackup } from '../features/import-export/backupJson'
 import { parseMyFlightbookCsv, serializeToMyFlightbookCsv } from '../features/import-export/myflightbookCsv'
+import { AircraftSettings } from './AircraftSettings'
 
 function downloadFile(content: string, filename: string, mime: string) {
   const blob = new Blob([content], { type: mime })
@@ -18,11 +20,19 @@ export function Settings({
   onImport,
   darkMode,
   onToggleDarkMode,
+  aircraft,
+  onSaveAircraft,
+  onDeleteAircraft,
+  onBulkAddAircraft,
 }: {
   flights: Flight[]
   onImport: (flights: Flight[]) => void
   darkMode: boolean
   onToggleDarkMode: () => void
+  aircraft: Aircraft[]
+  onSaveAircraft: (a: Aircraft) => void
+  onDeleteAircraft: (id: string) => void
+  onBulkAddAircraft: (list: Aircraft[]) => void
 }) {
   const [message, setMessage] = useState<string | null>(null)
   const [updateStatus, setUpdateStatus] = useState<string | null>(null)
@@ -121,6 +131,14 @@ export function Settings({
           />
         </div>
       </section>
+
+      <AircraftSettings
+        aircraft={aircraft}
+        flights={flights}
+        onSave={onSaveAircraft}
+        onDelete={onDeleteAircraft}
+        onBulkAdd={onBulkAddAircraft}
+      />
 
       <section className="space-y-2">
         <h2 className="font-semibold text-slate-900 dark:text-slate-100">Updates</h2>
