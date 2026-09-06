@@ -1,6 +1,12 @@
 import { useEffect, useRef, useState } from 'react'
 import type { AdvancedFields, Flight, FlightTag, Role } from '../models/flight'
-import { decimalHoursToHHMM, hhmmToDecimalHours } from '../lib/time'
+import {
+  combineDateAndTime,
+  decimalHoursToHHMM,
+  durationBetweenClockTimes,
+  extractTimeOfDay,
+  hhmmToDecimalHours,
+} from '../lib/time'
 
 const ROLES: Role[] = ['Dual', 'PIC', 'SIC', 'CFI']
 const PRESET_TAGS: FlightTag[] = ['Training', 'Firefighting', 'Ferry', 'Simulator', 'Checkride']
@@ -24,8 +30,6 @@ const ADVANCED_FIELDS: AdvancedFieldConfig[] = [
   { key: 'hobbsEnd', label: 'Hobbs end', type: 'number' },
   { key: 'engineStart', label: 'Engine start (UTC)', type: 'text' },
   { key: 'engineEnd', label: 'Engine end (UTC)', type: 'text' },
-  { key: 'flightStart', label: 'Flight start (UTC)', type: 'text' },
-  { key: 'flightEnd', label: 'Flight end (UTC)', type: 'text' },
   { key: 'blockIn', label: 'Block in', type: 'text' },
   { key: 'blockOut', label: 'Block out', type: 'text' },
   { key: 'complex', label: 'Complex', type: 'boolean' },
@@ -62,8 +66,39 @@ export function FlightForm({
   const [flight, setFlight] = useState<Flight>(initial)
   const [showAdvanced, setShowAdvanced] = useState(false)
 
+  // Clock times (Flight Start/End) are the primary, fast way to log a time - duration
+  // is derived from them. Falls back to typing a duration directly for flights where
+  // there's no precise clock time (older entries, quick logging, imported data that
+  // only ever had a total).
+  const [timeMode, setTimeMode] = useState<'clock' | 'duration'>(() =>
+    initial.advanced.flightStart && initial.advanced.flightEnd
+      ? 'clock'
+      : initial.totalTimeDecimal
+        ? 'duration'
+        : 'clock',
+  )
+  const [departure, setDeparture] = useState(() => extractTimeOfDay(initial.advanced.flightStart))
+  const [landing, setLanding] = useState(() => extractTimeOfDay(initial.advanced.flightEnd))
+
   function update<K extends keyof Flight>(key: K, value: Flight[K]) {
     setFlight((f) => ({ ...f, [key]: value }))
+  }
+
+  function updateClockTimes(nextDeparture: string, nextLanding: string) {
+    setDeparture(nextDeparture)
+    setLanding(nextLanding)
+    setFlight((f) => ({
+      ...f,
+      totalTimeDecimal:
+        nextDeparture && nextLanding
+          ? durationBetweenClockTimes(nextDeparture, nextLanding)
+          : f.totalTimeDecimal,
+      advanced: {
+        ...f.advanced,
+        flightStart: nextDeparture ? combineDateAndTime(f.date, nextDeparture) : undefined,
+        flightEnd: nextLanding ? combineDateAndTime(f.date, nextLanding) : undefined,
+      },
+    }))
   }
 
   function updateAdvanced<K extends keyof AdvancedFields>(key: K, value: AdvancedFields[K]) {
@@ -87,15 +122,50 @@ export function FlightForm({
           onChange={(e) => update('date', e.target.value)}
         />
       </Field>
-      <Field label="Total time (HH:MM)">
-        <input
-          type="text"
-          className={inputClass}
-          placeholder="1:30"
-          defaultValue={decimalHoursToHHMM(flight.totalTimeDecimal)}
-          onBlur={(e) => update('totalTimeDecimal', hhmmToDecimalHours(e.target.value || '0:00'))}
-        />
-      </Field>
+      {timeMode === 'clock' ? (
+        <>
+          <div className="grid grid-cols-2 gap-3">
+            <Field label="Departure">
+              <input
+                type="time"
+                className={inputClass}
+                value={departure}
+                onChange={(e) => updateClockTimes(e.target.value, landing)}
+              />
+            </Field>
+            <Field label="Landing">
+              <input
+                type="time"
+                className={inputClass}
+                value={landing}
+                onChange={(e) => updateClockTimes(departure, e.target.value)}
+              />
+            </Field>
+          </div>
+          {departure && landing && (
+            <p className="text-sm text-slate-500 dark:text-slate-400 -mt-2">
+              Duration: <span className="font-mono">{decimalHoursToHHMM(flight.totalTimeDecimal)}</span>
+            </p>
+          )}
+        </>
+      ) : (
+        <Field label="Total time (HH:MM)">
+          <input
+            type="text"
+            className={inputClass}
+            placeholder="1:30"
+            defaultValue={decimalHoursToHHMM(flight.totalTimeDecimal)}
+            onBlur={(e) => update('totalTimeDecimal', hhmmToDecimalHours(e.target.value || '0:00'))}
+          />
+        </Field>
+      )}
+      <button
+        type="button"
+        onClick={() => setTimeMode((m) => (m === 'clock' ? 'duration' : 'clock'))}
+        className="text-xs text-blue-600 dark:text-blue-400 font-medium -mt-2"
+      >
+        {timeMode === 'clock' ? 'Enter duration directly instead' : 'Enter departure/landing time instead'}
+      </button>
 
       <div className="grid grid-cols-2 gap-3">
         <Field label="Model">
